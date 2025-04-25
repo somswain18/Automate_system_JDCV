@@ -98,7 +98,7 @@ async def fetch_and_evaluate_resumes(
 
 # Send Feedback to Selected Candidates Endpoint
 @app.post("/send-feedback/")
-async def send_feedback_to_selected_candidates(
+async def send_feedback_email(
     background_tasks: BackgroundTasks,
     sender_email: str = Form(...),
     password: str = Form(...),
@@ -107,6 +107,8 @@ async def send_feedback_to_selected_candidates(
     try:
         
         db = load_db()
+        db = [row for row in db if row.get("Masked Email") and row.get("Masked Email") != "Not Found"]
+
         if not db:
             
             return JSONResponse(content={"message": "Database is empty!"}, status_code=404)
@@ -120,14 +122,29 @@ async def send_feedback_to_selected_candidates(
         matched_candidates = []
         skipped_candidates = []
 
+        # for row in db:
+        #     email_id = row.get("Masked Email")
+        #     if not email_id:
+        #         skipped_candidates.append(row)  
+        #         continue
+           
+        #     else:
+        #         matched_candidates.append(row)
+        print("📥 Recipients Sent:", recipients)
+        print("📄 Emails in DB:", [row.get("Masked Email") for row in db])
+
+        if len(recipients) == 1 and "," in recipients[0]:
+            recipients = [e.strip() for e in recipients[0].split(",")]
+
+        recipients_lower = [email.strip().lower() for email in recipients]
+
+
         for row in db:
             email_id = row.get("Masked Email")
-            if not email_id:
-                skipped_candidates.append(row)  
-                continue
-           
-            else:
+            if email_id and email_id.strip().lower() in recipients_lower:
                 matched_candidates.append(row)
+            else:
+                skipped_candidates.append(row)
 
         if not matched_candidates:
             return JSONResponse(content={"message": "No matching emails found in DB!"}, status_code=404)
@@ -145,10 +162,10 @@ async def send_feedback_to_selected_candidates(
                 batch_year=batch_year,
                 ai_exp=ai_exp
             )
-
+            
             background_tasks.add_task(
-                # send_feedback_email,
-                # sender_email,
+                send_feedback_email,
+                sender_email,
                 password,
                 email_id,
                 subject,

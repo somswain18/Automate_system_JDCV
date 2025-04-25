@@ -1,18 +1,25 @@
-# utils.py
-
 import os
-import requests
 from dotenv import load_dotenv
+from fastapi_mail import FastMail, MessageSchema, ConnectionConfig
 
 # Load environment variables from .env
 load_dotenv()
 
-# Mailgun credentials
-MAILGUN_API_KEY = os.getenv("MAILGUN_API_KEY")
-MAILGUN_DOMAIN = os.getenv("MAILGUN_DOMAIN")
-MAILGUN_FROM_EMAIL = f"Elint AI <mailgun@{MAILGUN_DOMAIN}>"
+# Configuration for FastAPI-Mail
+conf = ConnectionConfig(
+    MAIL_USERNAME=os.getenv("MAIL_USERNAME"),
+    MAIL_PASSWORD=os.getenv("MAIL_PASSWORD"),
+    MAIL_FROM=os.getenv("MAIL_FROM"),
+    MAIL_PORT=int(os.getenv("MAIL_PORT")),
+    MAIL_SERVER=os.getenv("MAIL_SERVER"),
+    MAIL_FROM_NAME=os.getenv("MAIL_FROM_NAME"),
+    MAIL_STARTTLS=os.getenv("MAIL_STARTTLS") == "True",
+    MAIL_SSL_TLS=os.getenv("MAIL_SSL_TLS") == "True",
+    USE_CREDENTIALS=os.getenv("USE_CREDENTIALS") == "True",
+    VALIDATE_CERTS=os.getenv("VALIDATE_CERTS") == "True"
+)
 
-# Generate feedback email body
+# ✅ Function to generate feedback content
 def generate_feedback_email(candidate_name, jd_cv_score, batch_year=None, ai_exp=None):
     subject = "Resume Feedback from Elint AI"
     match_score_percent = round(jd_cv_score * 1, 2)
@@ -23,42 +30,33 @@ def generate_feedback_email(candidate_name, jd_cv_score, batch_year=None, ai_exp
         eligibility_message = "Congratulations! You are eligible for the next round."
 
     body = f"""
-    Dear {candidate_name},
+    Dear {candidate_name},<br><br>
 
-    Thank you for applying.
+    Thank you for applying.<br><br>
 
-    Based on our evaluation:
-    - JD Match Score: {match_score_percent}%
+    Based on our evaluation:<br>
+    - JD Match Score: {match_score_percent}%<br>
+    - Batch Year: {batch_year}<br>
+    - AI Experience: {ai_exp}<br><br>
 
-    Batch Year: {batch_year}
-    AI Experience: {ai_exp}
+    <b>{eligibility_message}</b><br><br>
 
-    {eligibility_message}
+    We appreciate your interest and will get back to you soon.<br><br>
 
-    We appreciate your interest and will get back to you soon.
-
-    Regards,  
+    Regards,<br>
     Elint AI Team
     """
     return subject, body
 
-# Send feedback email via Mailgun API
-def send_feedback_email(recipient_email, subject, body):
-    try:
-        response = requests.post(
-            f"https://api.mailgun.net/v3/{MAILGUN_DOMAIN}/messages",
-            auth=("api", MAILGUN_API_KEY),
-            data={
-                "from": MAILGUN_FROM_EMAIL,
-                "to": recipient_email,
-                "subject": subject,
-                "text": body
-            }
-        )
+# ✅ Function to send the email asynchronously
+async def send_feedback_email(recipient_email, subject, body):
+    message = MessageSchema(
+        subject=subject,
+        recipients=[recipient_email],
+        body=body,
+        subtype="html"
+    )
 
-        if response.status_code == 200:
-            print(f"✅ Feedback email sent to {recipient_email}")
-        else:
-            print(f"❌ Failed to send email to {recipient_email}. Response: {response.text}")
-    except Exception as e:
-        print(f"❌ Exception occurred while sending email: {e}")
+    fm = FastMail(conf)
+    await fm.send_message(message)
+    print(f"✅ Email sent to {recipient_email}")

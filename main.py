@@ -10,6 +10,9 @@ import os
 import smtplib
 from email.mime.text import MIMEText
 from dotenv import load_dotenv
+import asyncio
+from utils import send_feedback_email
+
 
 # Load environment variables from .env
 load_dotenv()
@@ -58,7 +61,7 @@ Elint AI Team
     return subject, body
 
 # ✅ Add this function to send the feedback email
-def send_feedback_email(sender_email, sender_password, recipient_email, subject, body):
+def send_feedback_email(sender_email, sender_password,recipient_email, subject, body):
     msg = MIMEText(body)
     msg["Subject"] = subject
     msg["From"] = sender_email
@@ -105,7 +108,8 @@ def process_resume(resume_path, jd_path):
     print(f"Appending to DB: {final_record}")
     append_to_db(final_record)
 
-    # After confirming the data is appended to the database, you can send the feedback email
+     
+    
     if resume_data["email"]:
         # Step 6: Generate and Send Feedback Email
         subject, body = generate_feedback_email(
@@ -115,6 +119,11 @@ def process_resume(resume_path, jd_path):
             ai_exp=evaluation["ai_experience"]
         )
 
-        send_feedback_email(sender_email, sender_password, resume_data["email"], subject, body)
+         # Call the async function and wait for it to finish
+        send_feedback_email(  
+                resume_data["email"],
+                subject,
+                body
+            )
     else:
         print("⚠️ No email found for this candidate. Skipping feedback email.")
